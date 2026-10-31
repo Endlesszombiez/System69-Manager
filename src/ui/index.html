@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>System69 Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><img class="brand-logo" src="logo.svg" alt=""><div>System69<small>MANAGER</small></div></div>
+    <div class="workspace-label">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <button class="nav-item selected" data-page="applications"><span>▦</span> Applications <b id="apps-nav-count">0</b></button>
+      <button class="nav-item" data-page="versions"><span>◈</span> Node.js runtimes <b id="nav-count">0</b></button>
+      <button class="nav-item" data-page="path"><span>⇄</span> PATH editor</button>
+      <button class="nav-item" data-page="chocolatey"><span>▣</span> Packages</button>
+      <button class="nav-item" data-page="disk"><span>▥</span> Disk map</button>
+      <button class="nav-item" data-page="activity"><span>≡</span> Activity</button>
+      <button class="nav-item" data-page="queue"><span>≡</span> Uninstall queue <b id="queue-nav-count">0</b></button>
+    </nav>
+    <div class="sidebar-tip"><span class="status-dot"></span> Your software, together.<p>Apps, runtimes, and paths.<br>One local workspace.</p></div>
+    <div class="sidebar-bottom"><img class="mini-logo" src="logo.svg" alt=""><div>System69 Manager <small>Version 1.1.1 · Windows</small></div></div>
+  </aside>
+  <div class="main-shell">
+    <header class="topbar"><div><span class="muted">Workspace</span><span class="slash">/</span><span id="breadcrumb">Installed versions</span></div><div class="topbar-right"><span id="permission" class="badge">User access</span><button id="admin-button" class="text-button">Run as administrator ↗</button></div></header>
+    <main>
+      <div id="notice" role="status" class="notice hidden"></div>
+      <section id="applications-page" class="page">
+        <div class="page-heading"><div><div class="eyebrow">YOUR SOFTWARE, TOGETHER</div><h1>Applications</h1><p>Find, hide, and remove software from one calm workspace.</p></div><button id="refresh-apps" class="button">↻ &nbsp; Refresh inventory</button></div>
+        <div class="app-options"><label><input type="checkbox" id="show-hidden"> Show hidden apps</label><label><input type="checkbox" id="include-brew"> Include Homebrew in WSL on next refresh</label></div>
+        <div class="list-toolbar"><label class="search"><span>⌕</span><input id="app-search" type="search" placeholder="Search applications, publishers, or package IDs…" aria-label="Search applications"></label><select id="app-source" aria-label="Application source"><option value="">All sources</option><option value="Windows">Windows</option><option value="Winget">WinGet</option><option value="Chocolatey">Chocolatey</option><option value="Store">Microsoft Store</option><option value="Homebrew">Homebrew · WSL</option></select></div>
+        <div class="app-table"><table><thead><tr><th>Application</th><th>Version</th><th>Source</th><th>Reported size</th><th>Uninstall mode</th></tr></thead><tbody id="app-rows"></tbody></table></div>
+        <div class="app-list-footer"><label><input id="app-select-all" type="checkbox"> Select all filtered</label><span><b id="apps-count">0</b> source entries · Windows sizes are estimates</span></div>
+        <p id="app-notices" class="muted app-notices"></p>
+        <div class="selection-bar"><div><strong id="app-selection">0 applications selected</strong><p>Review commands and cleanup folders before uninstalling.</p></div><div class="selection-actions"><button id="hide-apps" class="button">Hide selected</button><button id="unhide-apps" class="button">Unhide selected</button><button id="review-apps" class="button primary">Review queue →</button></div></div>
+        <div class="app-options uninstall-options"><label><input type="checkbox" id="silent-only" checked> Silent only</label><label><input type="checkbox" id="advanced-cleanup"> Advanced leftover cleanup</label><span>Cleanup is limited to verified app-specific folders.</span></div>
+      </section>
+      <section id="queue-page" class="page hidden"><div class="page-heading"><div><div class="eyebrow">OPERATIONS</div><h1>Uninstall queue</h1><p>One application at a time, with every action recorded.</p></div><button id="clear-queue" class="button">Clear queue</button></div><div id="queue-warning" class="info-panel"></div><div id="queue-list"></div><div class="queue-consent"><label><input type="checkbox" id="queue-reviewed"> I reviewed the applications and exact cleanup folders. Uninstalls and approved cleanup can permanently remove files.</label><div><button id="stop-queue" class="button hidden">Stop after current</button><button id="start-queue" class="button primary">Uninstall reviewed apps</button></div></div></section>
+      <section id="versions-page" class="page hidden">
+        <div class="page-heading"><div><div class="eyebrow">LOCAL ENVIRONMENT</div><h1>Node.js runtimes</h1><p>Every version, one place. Keep your next project moving.</p></div><div class="heading-actions"><button id="refresh" class="button">↻ &nbsp; Refresh</button><button id="open-install" class="button primary">＋ &nbsp; Install a version</button></div></div>
+        <div class="stats"><article class="stat"><span>INSTALLED VERSIONS</span><strong id="installed-count">—</strong><small>Across your local environment</small></article><article class="stat"><span>ACTIVE IN PATH <i class="status-dot"></i></span><strong id="active-version">—</strong><small id="active-description">The first Node.js in saved PATH</small></article><article class="stat"><span>UPDATES AVAILABLE</span><strong id="update-count">—</strong><small>Latest release within each major</small></article></div>
+        <div class="section-heading"><div><h2>Installed versions <span id="list-count" class="count">0</span></h2><p>Manage runtimes and choose what your terminal finds first.</p></div><button id="add-folder" class="text-button">＋ Add existing folder</button></div>
+        <div class="list-toolbar"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Find a version or installation path…" aria-label="Search installed versions"></label><label class="filter-label">Show <select id="version-filter" aria-label="Filter installed versions"><option value="all">All versions</option><option value="updates">Updates available</option><option value="path">In PATH</option><option value="managed">Managed by app</option></select></label></div>
+        <div id="version-list" class="version-list" aria-live="polite"></div>
+        <div class="footnote"><span>ⓘ</span><p>Multiple versions can live in PATH. Your terminal uses the first match.<br>Changes apply to new terminals; a project’s version manager may override them.</p><button class="text-button" data-go="path">Open PATH editor →</button></div>
+        <div class="catalog-status"><span id="catalog-status">Release catalog has not been checked.</span><button id="check-updates" class="text-button">Check for updates ↗</button></div>
+      </section>
+      <section id="path-page" class="page hidden">
+        <div class="page-heading"><div><div class="eyebrow">ENVIRONMENT</div><h1>PATH editor</h1><p>Review, reorder, and save the directories Windows searches.</p></div><button id="restore-path" class="button">Undo last PATH save</button></div>
+        <div class="info-panel">Windows normally searches Machine PATH before User PATH. A User PATH entry cannot outrank Node.js in Machine PATH. Existing terminals and version-manager shims may use a different environment.</div>
+        <div class="section-heading"><div class="tabs"><button data-scope="User" class="tab selected">User PATH</button><button data-scope="Machine" class="tab">Machine PATH</button></div><span id="path-dirty" class="muted">No unsaved changes</span></div>
+        <div id="path-list" class="path-list"></div>
+        <div class="path-add"><select id="path-installation" aria-label="Installation to add to PATH"></select><button id="path-add" class="button">＋ Add to PATH</button></div>
+        <div class="path-footer"><p id="path-permission">Changes affect your Windows user account.</p><div><button id="discard-path" class="button">Discard changes</button><button id="save-path" class="button primary">Review & save PATH</button></div></div>
+      </section>
+      <section id="chocolatey-page" class="page hidden">
+        <div class="page-heading"><div><div class="eyebrow">PACKAGE MANAGER</div><h1>Packages</h1><p>Manage Node.js packages through Chocolatey.</p></div><span id="choco-status" class="badge">Checking…</span></div>
+        <div class="info-panel">Chocolatey packages share a system installation and can replace one another. Use “Install a version” for independent, side-by-side runtimes. Package changes require administrator access.</div>
+        <article id="choco-setup" class="panel hidden"><h2>Set up Chocolatey</h2><p>Install the official Chocolatey package manager. This downloads and runs its setup script from community.chocolatey.org.</p><button id="setup-choco" class="button primary">Set up Chocolatey</button></article>
+        <div id="choco-packages" class="package-grid"></div>
+        <div class="panel"><h2>Install a specific package version</h2><p>Chocolatey package availability can lag behind nodejs.org. A version must exist in the Chocolatey community feed.</p><div class="inline-form"><select id="choco-package" aria-label="Chocolatey package"><option>nodejs-lts</option><option>nodejs.install</option><option>nodejs</option></select><input id="choco-version" placeholder="e.g. 24.11.0" aria-label="Chocolatey version"><button id="choco-specific" class="button">Install version</button></div></div>
+      </section>
+      <section id="disk-page" class="page hidden">
+        <div class="page-heading"><div><div class="eyebrow">STORAGE EXPLORER</div><h1>Disk map</h1><p>See what takes up space. Map any folder to look closer.</p></div><div class="heading-actions"><button id="disk-cancel" class="button hidden">Cancel scan</button><button id="disk-remap" class="button">↻ Map again</button><button id="disk-open-picker" class="button primary">Choose folder</button></div></div>
+        <div id="disk-root-path" class="disk-root-path">No folder mapped</div>
+        <div class="disk-meta"><strong id="disk-summary">Logical file sizes · links are not followed</strong><span id="disk-status" role="status">Choose a folder to begin.</span></div>
+        <div class="disk-view-controls"><label>Visible depth <select id="disk-depth" aria-label="Treemap visible depth"><option value="1">1 level</option><option value="2">2 levels</option><option value="3">3 levels</option><option value="4" selected>4 levels</option><option value="5">5 levels</option><option value="6">6 levels</option></select></label><span>All readable contents are scanned. Smaller details may be summarized; map a folder to expand them.</span></div>
+        <div id="disk-treemap" class="disk-treemap" aria-label="Disk usage treemap"></div>
+        <div class="disk-caption">Area represents logical file bytes, not allocated disk space. Hard links are counted per entry. Right-click a tile or list item for folder actions.</div>
+        <div id="disk-selection" class="disk-selection hidden"><div><strong id="disk-selected"></strong><p id="disk-selected-size"></p><p id="disk-protection"></p></div><div class="selection-actions"><button id="disk-map-selected" class="button">Map this folder</button><button id="disk-reveal" class="button">Reveal in Explorer</button><button id="disk-delete" class="button danger hidden">Delete…</button></div></div>
+        <div class="section-heading disk-list-heading"><h2>Largest entries in this folder</h2><span class="muted">Up to 100 entries</span></div><div class="disk-entry-table"><table><thead><tr><th>Name</th><th>Type</th><th>Logical size</th></tr></thead><tbody id="disk-rows"></tbody></table></div>
+        <div class="panel disk-integration"><div><h2>Map from File Explorer</h2><p>Add “Map with System69” to the directory context menu. On Windows 11 it appears under “Show more options.”</p><p id="disk-context-status">Disabled by default. Enable only if you want the Explorer shortcut.</p></div><button id="disk-context-toggle" class="button">Add “Map with System69” to Explorer</button></div>
+      </section>
+      <section id="activity-page" class="page hidden"><div class="page-heading"><div><div class="eyebrow">ACTIVITY</div><h1>Activity</h1><p>Operations, download verification, and package manager output.</p></div><button id="open-data" class="button">Open app data ↗</button></div><div class="section-heading"><h2>Operation log</h2><button id="refresh-log" class="text-button">Refresh log</button></div><pre id="activity-log" tabindex="0"></pre><p class="muted">PATH backups and the release cache are stored in app data. Last use is recorded only when a running node.exe is observed during a refresh.</p></section>
+    </main>
+    <footer class="statusbar"><div><span id="busy-dot" class="status-dot"></span><span id="operation-status" role="status">Ready</span></div><span id="platform-status">Windows · Local environment</span></footer>
+  </div>
+  <dialog id="install-dialog"><form method="dialog"><div class="modal-heading"><div><div class="eyebrow">OFFICIAL NODE.JS RELEASES</div><h2>Install a Node.js version</h2></div><button class="icon-button" aria-label="Close install dialog" value="cancel">×</button></div><p>Install a verified runtime alongside your existing versions.</p><label class="field-label" for="release-select">Version</label><select id="release-select"></select><label class="field-label" for="custom-version">Or enter an exact stable version</label><input id="custom-version" placeholder="24.11.0" pattern="v?[0-9]+\.[0-9]+\.[0-9]+"><div class="modal-note">SHA-256 verified · Includes npm · PATH stays under your control</div><div class="modal-actions"><button class="button" value="cancel">Cancel</button><button id="install-selected" type="button" class="button primary">Install Node.js</button></div></form></dialog>
+  <dialog id="map-folder-dialog"><form method="dialog"><div class="modal-heading"><div><div class="eyebrow">DISK MAP</div><h2>What folder would you like to map?</h2></div><button class="icon-button" aria-label="Close folder picker" value="cancel">×</button></div><p>Start with C:\, or choose a specific folder. Scanning never changes your files.</p><label class="field-label" for="disk-directory">Folder or drive</label><div class="disk-folder-input"><input id="disk-directory" value="C:\" autocomplete="off" spellcheck="false"><button type="button" id="disk-browse" class="button">Browse…</button></div><div class="modal-note">System locations can be mapped but are protected from deletion.</div><div class="modal-actions"><button class="button" value="cancel">Cancel</button><button id="disk-map-start" type="button" class="button primary">Map folder</button></div></form></dialog>
+  <script src="renderer.js"></script>
+  <script src="applications.js"></script>
+  <script src="treemap.js"></script>
+  <script src="disk-map.js"></script>
+</body>
+</html>

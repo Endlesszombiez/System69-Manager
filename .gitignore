@@ -1,0 +1,9 @@
+node_modules/
+release/
+artifacts/
+native-publish/
+**/bin/
+**/obj/
+*.log
+graphify-out/.graphify.lock
+/graphify-out

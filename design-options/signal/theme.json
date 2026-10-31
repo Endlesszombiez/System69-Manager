@@ -1,0 +1,16 @@
+{
+  "name": "Signal",
+  "bg": "#F3F6FA",
+  "panel": "#FFFFFF",
+  "side": "#EBF0F7",
+  "ink": "#172B46",
+  "muted": "#5A6C82",
+  "line": "#D9E2ED",
+  "accent": "#235CD8",
+  "soft": "#E9F0FE",
+  "on": "#FFFFFF",
+  "danger": "#B53643",
+  "success": "#26704A",
+  "radius": "10px",
+  "font": "\"Segoe UI\", sans-serif"
+}

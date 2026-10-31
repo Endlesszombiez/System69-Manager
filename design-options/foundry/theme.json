@@ -1,0 +1,16 @@
+{
+  "name": "Foundry",
+  "bg": "#F4F0E8",
+  "panel": "#FFFCF6",
+  "side": "#EAE5DA",
+  "ink": "#302B26",
+  "muted": "#706457",
+  "line": "#DCD3C6",
+  "accent": "#A64222",
+  "soft": "#F6E5D8",
+  "on": "#FFFFFF",
+  "danger": "#A82E3D",
+  "success": "#386448",
+  "radius": "5px",
+  "font": "\"Segoe UI\", sans-serif"
+}

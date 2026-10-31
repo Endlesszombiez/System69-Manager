@@ -1,0 +1,16 @@
+{
+  "name": "Orbit",
+  "bg": "#10151E",
+  "panel": "#19212D",
+  "side": "#141C27",
+  "ink": "#EFF5F7",
+  "muted": "#A5B2C5",
+  "line": "#334052",
+  "accent": "#A5EFCE",
+  "soft": "#263E3C",
+  "on": "#132A23",
+  "danger": "#FFA7AD",
+  "success": "#A5EFCE",
+  "radius": "16px",
+  "font": "\"Segoe UI\", sans-serif"
+}

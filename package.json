@@ -12,6 +12,7 @@
     "test:packaged": "node scripts/desktop-smoke.cjs --packaged",
     "test:install": "node scripts/install-smoke.cjs",
     "check": "node scripts/check.cjs",
+    "build": "npm run dist -- --publish never",
     "pack": "electron-builder --win --dir",
     "dist": "electron-builder --win nsis",
     "build:native": "node scripts/build-native.cjs",

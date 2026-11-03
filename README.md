@@ -6,7 +6,7 @@ A Windows desktop workspace combining software removal with Node.js version and 
 
 ## Install
 
-Windows 10/11 x64. Run `release/System69-Manager-Setup-1.1.1.exe`. The installer bundles Electron and a self-contained .NET helper; users do not need Node.js or .NET installed. Chocolatey setup is optional on the installer setup page. Builds are unsigned.
+Windows 10/11 x64. Download the installer EXE from [GitHub Releases](https://github.com/Endlesszombiez/system69-manager/releases/latest) and run it. The installer bundles Electron and a self-contained .NET helper; users do not need Node.js or .NET installed. Chocolatey setup is optional on the installer setup page. Builds are unsigned.
 
 ## Applications and uninstall queue
 
@@ -66,6 +66,21 @@ npm run test:disk:packaged
 `npm run build:native` runs the native safety tests and publishes a self-contained helper. `npm run dist` builds the helper and the NSIS installer. `npm start -- --demo` uses sample inventory and prevents system mutations. Desktop checks cover application search, hide/unhide, review, runtime filtering, PATH drafts, permissions, packages, activity, and install dialogs. Live inventory checks only scan inventory and write isolated preferences. The dedicated disk-delete check creates uniquely named disposable files under Downloads, exercises failed-recycle restoration and a Recycle Bin move, and preserves a neighboring test file. No pre-existing user files are deleted, no software is uninstalled, and system PATH is unchanged.
 
 Release limits: installer and executables are unsigned. Real vendor uninstall, UAC, restart, and elevated package-manager workflows still require a disposable Windows VM release pass. Silent behavior depends on each vendor uninstaller and package script.
+
+## Build and publish a release
+
+`npm run build` runs the native safety tests, publishes the self-contained .NET helper, and builds the Windows x64 installer in `release/`. Run it on Windows after `npm ci`; it requires the .NET 10 SDK. This command builds locally without publishing.
+
+To publish on GitHub, commit the desired version in `package.json` and `package-lock.json`, push that commit, then create and push the matching tag:
+
+```powershell
+git tag v1.1.1
+git push origin v1.1.1
+```
+
+Replace `1.1.1` with the package version for each release. The **Release Windows installer** GitHub Actions workflow checks that the tag matches `package.json`, runs the JavaScript checks/tests and native safety tests, and builds the installer on Windows. After a successful build, it creates a GitHub Release with generated notes and attaches `System69-Manager-Setup-<version>.exe` under **Assets**. It uses the built-in GitHub token; no extra publishing secret is required.
+
+To retry an existing tag, select **Actions → Release Windows installer → Run workflow** and enter the tag. Reruns reuse an existing release and replace its installer asset. The installer is also retained as a workflow artifact for seven days. GitHub Actions must be enabled for the repository. Builds remain unsigned.
 
 ## Implementation
 

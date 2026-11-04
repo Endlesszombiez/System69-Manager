@@ -11,7 +11,7 @@ public static partial class CommandPolicy
     [GeneratedRegex(@"\{[0-9A-Fa-f]{8}-(?:[0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}\}")]
     private static partial Regex EmbeddedProductCode();
 
-    public static UninstallCommand Create(InstalledApp app)
+    public static UninstallCommand Create(InstalledApp app, bool quiet = true)
     {
         if (app.Protected) throw new InvalidOperationException("This package is protected and cannot be removed.");
         if (app.Source == PackageSource.Chocolatey && app.Id.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -20,11 +20,11 @@ public static partial class CommandPolicy
             throw new InvalidOperationException("Invalid package identifier.");
         return app.Source switch
         {
-            PackageSource.Winget => new("winget.exe", ["uninstall", "--id", app.Id, "--exact", "--silent", "--disable-interactivity"], true),
-            PackageSource.Chocolatey => new("choco.exe", ["uninstall", app.Id, "--yes", "--no-progress", "--limit-output"], true),
+            PackageSource.Winget => new("winget.exe", quiet ? ["uninstall", "--id", app.Id, "--exact", "--silent", "--disable-interactivity"] : ["uninstall", "--id", app.Id, "--exact", "--interactive"], quiet),
+            PackageSource.Chocolatey => new("choco.exe", quiet ? ["uninstall", app.Id, "--yes", "--no-progress", "--limit-output"] : ["uninstall", app.Id, "--yes", "--no-progress", "--limit-output", "--not-silent"], quiet),
             PackageSource.Homebrew => new("wsl.exe", ["--exec", "/home/linuxbrew/.linuxbrew/bin/brew", "uninstall", "--formula", app.Id], true),
             PackageSource.Store => StoreCommand(app),
-            _ => WindowsCommand(app)
+            _ => WindowsCommand(app, quiet)
         };
     }
 
@@ -35,16 +35,16 @@ public static partial class CommandPolicy
         return new("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script))], true);
     }
 
-    private static UninstallCommand WindowsCommand(InstalledApp app)
+    private static UninstallCommand WindowsCommand(InstalledApp app, bool preferQuiet)
     {
         if (app.WindowsInstaller)
         {
             var registeredKey = app.Id.Split('|').Last();
             var code = ProductCode().IsMatch(registeredKey) ? registeredKey : EmbeddedProductCode().Match(app.UninstallCommand ?? "").Value;
             if (!ProductCode().IsMatch(code)) throw new InvalidOperationException("The MSI product code could not be verified.");
-            return new("msiexec.exe", ["/x", code, "/qn", "/norestart"], true);
+            return new("msiexec.exe", ["/x", code, preferQuiet ? "/qn" : "/qf", "/norestart"], preferQuiet);
         }
-        var quiet = !string.IsNullOrWhiteSpace(app.QuietCommand);
+        var quiet = preferQuiet && !string.IsNullOrWhiteSpace(app.QuietCommand);
         var command = quiet ? app.QuietCommand! : app.UninstallCommand;
         if (string.IsNullOrWhiteSpace(command)) throw new InvalidOperationException("No registered uninstall command is available.");
         var (executable, arguments) = SplitRegisteredCommand(command);

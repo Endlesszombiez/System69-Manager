@@ -4,11 +4,11 @@ const path = require('node:path');
 const { normalizePath, splitPath, validateEntries, assertUnchanged } = require('./model.cjs');
 const psQuote = value => "'" + String(value).replaceAll("'", "''") + "'";
 const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-function run(file, args, { timeout = 30000, onOutput } = {}) {
+function run(file, args, { timeout = 30000, onOutput, killOnTimeout = true } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(file, args, { windowsHide: true, shell: false });
     let output = '', errors = '', done = false;
-    const timer = setTimeout(() => { child.kill(); finish(new Error('Operation timed out. Refresh to check its result.')); }, timeout);
+    const timer = setTimeout(() => { if(killOnTimeout) child.kill(); finish(new Error(killOnTimeout ? 'Operation timed out. Refresh to check its result.' : 'Operation timed out. The installer was left running. Finish its prompts and restart System69 before continuing.')); }, timeout);
     function finish(error, result) { if (done) return; done = true; clearTimeout(timer); error ? reject(error) : resolve(result); }
     child.stdout.on('data', b => { output += b; onOutput?.(String(b)); });
     child.stderr.on('data', b => { errors += b; onOutput?.(String(b)); });
@@ -52,4 +52,13 @@ async function savePath(scope, entries, expected, dataDir, execute = ps) {
 }
 function expandEnv(value) { return value.replace(/%([^%]+)%/g, (all, key) => Object.entries(process.env).find(([k]) => k.toLowerCase() === key.toLowerCase())?.[1] || all); }
 function resolveEntries(value) { return splitPath(value || '').map(p => normalizePath(expandEnv(p))); }
-module.exports = { run, ps, psQuote, facts, savePath, expandEnv, resolveEntries, powershell };
+async function pythonFacts() {
+  return JSON.parse(await ps(`
+    $admin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $apps=@(Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match '^Python ' } | Select-Object DisplayName,DisplayVersion,InstallLocation)
+    $directories=@(foreach($root in @('HKCU:\\Software\\Python\\PythonCore','HKLM:\\Software\\Python\\PythonCore','HKLM:\\Software\\WOW6432Node\\Python\\PythonCore')) { Get-ChildItem $root -ErrorAction SilentlyContinue | ForEach-Object { $key=Get-Item ($_.PSPath+'\\InstallPath') -ErrorAction SilentlyContinue; if($key){$key.GetValue('')} } })
+    $running=@(Get-CimInstance Win32_Process -Filter "name = 'python.exe' OR name = 'pythonw.exe'" -ErrorAction SilentlyContinue | Where-Object ExecutablePath | Select-Object -ExpandProperty ExecutablePath)
+    [pscustomobject]@{admin=$admin;userPath=[Environment]::GetEnvironmentVariable('Path','User');machinePath=[Environment]::GetEnvironmentVariable('Path','Machine');apps=$apps;directories=$directories;running=$running} | ConvertTo-Json -Depth 5 -Compress
+  `));
+}
+module.exports = { run, ps, psQuote, facts, pythonFacts, savePath, expandEnv, resolveEntries, powershell };

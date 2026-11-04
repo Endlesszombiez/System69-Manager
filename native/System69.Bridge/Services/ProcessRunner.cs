@@ -9,13 +9,13 @@ public static class ProcessRunner
 {
     public static async Task<ProcessResult> RunAsync(string executable, IEnumerable<string> arguments, CancellationToken token, TimeSpan? timeout = null, string? rawArguments = null, bool quiet = true)
     {
-        var info = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = quiet };
+        var info = new ProcessStartInfo(executable) { UseShellExecute = !quiet, RedirectStandardOutput = quiet, RedirectStandardError = quiet, CreateNoWindow = quiet };
         if (rawArguments is not null) info.Arguments = rawArguments;
         else foreach (var argument in arguments) info.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = info };
         process.Start();
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
+        var stdout = quiet ? process.StandardOutput.ReadToEndAsync() : Task.FromResult("");
+        var stderr = quiet ? process.StandardError.ReadToEndAsync() : Task.FromResult("");
         using var timeoutToken = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeoutToken.CancelAfter(timeout ?? TimeSpan.FromMinutes(30));
         try { await process.WaitForExitAsync(timeoutToken.Token); }

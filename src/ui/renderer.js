@@ -3,7 +3,7 @@ const api = window.nodeManager;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const state = { snapshot:null, catalog:null, page:'applications', scope:'User', drafts:{User:[],Machine:[]}, busy:false, localBusy:false };
-const labels = { applications:'Applications', queue:'Uninstall queue', disk:'Disk map', versions:'Installed versions', path:'PATH editor', chocolatey:'Packages', activity:'Activity' };
+const labels = { applications:'Applications', queue:'Uninstall queue', disk:'Disk map', versions:'Installed versions', python:'Python runtimes', path:'PATH editor', chocolatey:'Packages', activity:'Activity' };
 const pathEntries = value => value ? value.split(';') : [];
 const samePath = (a,b) => a.replace(/^"|"$/g,'').replace(/\\+$/,'').toLowerCase() === b.replace(/^"|"$/g,'').replace(/\\+$/,'').toLowerCase();
 const date = value => value ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value)?value+'T12:00:00':value).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}) : 'Not available';
@@ -31,6 +31,7 @@ async function task(callback) {
 }
 async function loadSnapshot(resetDrafts=true) {
   state.snapshot=await api.invoke('snapshot');
+  if(pythonState.snapshot)await loadPython();
   if(resetDrafts) for(const scope of ['User','Machine']) state.drafts[scope]=pathEntries(state.snapshot[scope.toLowerCase()+'Path']);
   render();
 }
@@ -89,6 +90,8 @@ function switchPage(page) {
   for(const b of $$('[data-page]')) b.classList.toggle('selected',b.dataset.page===page);
   $('#breadcrumb').textContent=labels[page];
   if(page==='activity') loadLog();
+  if(page==='python'&&!pythonState.snapshot)task(loadPython);
+  if(page==='path'&&!pythonState.snapshot)task(loadPython);
   if(page==='disk'&&typeof diskState!=='undefined'&&diskState.result)requestAnimationFrame(renderDisk);
 }
 function dirty(scope=state.scope) { return state.drafts[scope].join(';') !== state.snapshot?.[scope.toLowerCase()+'Path']; }
@@ -107,7 +110,7 @@ function renderPath() {
   for(const b of $$('[data-scope]')) b.classList.toggle('selected',b.dataset.scope===state.scope);
   entries.forEach((value,index)=>{
     const row=el('div','path-row'),text=el('div','path-value',value||'(empty entry preserved)');
-    const installation=state.snapshot.installations.find(i=>samePath(i.directory,value));
+    const installation=[...state.snapshot.installations,...(pythonState.snapshot?.installations||[])].find(i=>samePath(i.directory,value));
     if(installation) text.append(el('small','',`${installation.version} · ${installation.source}`));
     const move=delta=>{[entries[index],entries[index+delta]]=[entries[index+delta],entries[index]];renderPath();};
     row.append(el('span','index',String(index+1).padStart(2,'0')),text,button('↑',()=>move(-1),'icon-button',index===0,'Move up'),button('↓',()=>move(1),'icon-button',index===entries.length-1,'Move down'),button('×',()=>{entries.splice(index,1);renderPath();},'icon-button',false,'Remove PATH entry'));
@@ -118,8 +121,8 @@ function renderPath() {
   $('#path-permission').textContent=state.scope==='User'?'Changes affect your Windows user account.':state.snapshot.admin?'Changes affect every user on this computer.':'Administrator access is required to save Machine PATH.';
   lockButton($('#save-path'),!dirty()||state.scope==='Machine'&&!state.snapshot.admin);
   const select=$('#path-installation');select.replaceChildren();
-  for(const i of state.snapshot.installations) { const option=el('option','',`${i.version} — ${i.directory}`);option.value=i.directory;select.append(option); }
-  lockButton($('#path-add'),!state.snapshot.installations.length);
+  for(const i of [...state.snapshot.installations,...(pythonState.snapshot?.installations||[]).flatMap(i=>pythonPaths(i).map(directory=>({...i,version:'Python '+i.version,directory})))]) { const option=el('option','',`${i.version} — ${i.directory}`);option.value=i.directory;select.append(option); }
+  lockButton($('#path-add'),!select.options.length);
   updateBusy();
 }
 function renderChocolatey() {

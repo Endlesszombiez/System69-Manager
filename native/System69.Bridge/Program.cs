@@ -90,12 +90,21 @@ while (await Console.In.ReadLineAsync() is { } line)
                         if (hidden.Contains(a)) throw new InvalidOperationException("Hidden applications cannot be queued.");
                         if (a.Name.StartsWith("Node.js", StringComparison.OrdinalIgnoreCase) || new[] { "nodejs", "nodejs.install", "nodejs-lts", "OpenJS.NodeJS", "OpenJS.NodeJS.LTS" }.Contains(a.Id, StringComparer.OrdinalIgnoreCase))
                             throw new InvalidOperationException("Use Node.js runtimes to remove this installation after checking PATH and running processes.");
-                        var command = CommandPolicy.Create(a);
-                        if (silent && !command.Quiet) throw new InvalidOperationException("No documented silent uninstall command.");
+                        UninstallCommand? fallback = null;
+                        if (a.Source is PackageSource.Windows or PackageSource.Winget or PackageSource.Chocolatey)
+                        {
+                            try { fallback = CommandPolicy.Create(a, false); }
+                            catch (InvalidOperationException) { /* No safe interactive command is registered. */ }
+                        }
+                        UninstallCommand command;
+                        try { command = CommandPolicy.Create(a, silent); }
+                        catch (InvalidOperationException) when (fallback is not null) { command = fallback; }
+                        if (!command.Quiet) fallback = null;
                         var decision = cleanup.Policy.Evaluate(a, apps);
                         var token = Guid.NewGuid().ToString("N");
-                        prepared[token] = new(a, command, advanced ? decision : new(false, "Advanced cleanup is off."), DateTime.UtcNow);
-                        reviews.Add(new { key = Key(a), a.Name, a.SourceLabel, token, eligible = true, mode = command.Quiet ? "Silent requested" : "May show a window", command = command.FileName + " " + (command.RawArguments ?? string.Join(" ", command.Arguments)), cleanup = advanced && decision.Allowed ? decision.CanonicalPath : advanced ? "Skipped: " + decision.Reason : "Off" });
+                        prepared[token] = new(a, command, fallback, advanced ? decision : new(false, "Advanced cleanup is off."), DateTime.UtcNow);
+                        string Describe(UninstallCommand c) => c.FileName + " " + (c.RawArguments ?? string.Join(" ", c.Arguments));
+                        reviews.Add(new { key = Key(a), a.Name, a.SourceLabel, token, eligible = true, mode = command.Quiet ? fallback is null ? "Silent requested" : "Silent preferred; interactive fallback" : "Interactive uninstaller", command = Describe(command) + (fallback is null ? "" : "\nFallback: " + Describe(fallback)), cleanup = advanced && decision.Allowed ? decision.CanonicalPath : advanced ? "Skipped: " + decision.Reason : "Off" });
                     }
                     catch (Exception ex) { reviews.Add(new { key = Key(a), a.Name, a.SourceLabel, eligible = false, reason = ex.Message }); }
                 }
@@ -117,10 +126,22 @@ while (await Console.In.ReadLineAsync() is { } line)
                 }
                 try
                 {
-                    var run = await ProcessRunner.RunAsync(item.Command.FileName, item.Command.Arguments, CancellationToken.None, rawArguments: item.Command.RawArguments, quiet: item.Command.Quiet);
+                    var usedFallback = false;
+                    async Task<ProcessResult> Run(UninstallCommand c) => await ProcessRunner.RunAsync(c.FileName, c.Arguments, CancellationToken.None, rawArguments: c.RawArguments, quiet: c.Quiet);
+                    ProcessResult run;
+                    try { run = await Run(item.Command); }
+                    catch (System.ComponentModel.Win32Exception ex) when (item.Fallback is not null && ex.NativeErrorCode != 1223)
+                    { usedFallback = true; run = await Run(item.Fallback); }
+                    if (!usedFallback && item.Fallback is not null && run.ExitCode is not (0 or 1641 or 3010 or 1602 or 1223 or 1618)
+                        && (item.App.Source != PackageSource.Windows || InventoryService.IsRegistered(item.App)))
+                    {
+                        Send(new { @event = "progress", message = $"Silent uninstall failed for {item.App.Name}. Opening the interactive uninstaller." });
+                        usedFallback = true;
+                        run = await Run(item.Fallback);
+                    }
                     var restart = (item.App.WindowsInstaller || item.App.Source == PackageSource.Chocolatey) && run.ExitCode is 1641 or 3010;
                     var success = run.ExitCode == 0 || restart;
-                    var detail = success ? "Uninstaller reported success." : $"Exit {run.ExitCode}. {run.Error} {run.Output}";
+                    var detail = (usedFallback ? "Interactive fallback used. " : "") + (success ? "Uninstaller reported success." : $"Exit {run.ExitCode}. {run.Error} {run.Output}");
                     if (restart) { halted = true; detail = "Restart Windows before continuing. Cleanup skipped."; }
                     else if (success && item.Cleanup.Allowed)
                         detail = cleanup.Clean(item.App, InventoryService.ReadWindowsInventory(), item.Cleanup.CanonicalPath!);
@@ -136,4 +157,4 @@ while (await Console.In.ReadLineAsync() is { } line)
     }
     catch (Exception ex) { Send(new { id, ok = false, error = ex.Message }); }
 }
-sealed record Prepared(InstalledApp App, UninstallCommand Command, CleanupDecision Cleanup, DateTime Created);
+sealed record Prepared(InstalledApp App, UninstallCommand Command, UninstallCommand? Fallback, CleanupDecision Cleanup, DateTime Created);

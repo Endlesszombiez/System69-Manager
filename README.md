@@ -2,7 +2,7 @@
 
 # System69 Manager
 
-A Windows desktop workspace combining software removal with Node.js version and PATH management. Uses the Foundry block logo in Signal cobalt, a light theme, and subtle blue selections.
+A Windows desktop workspace combining software removal with Node.js, Python installation, and PATH management. Uses the Foundry block logo in Signal cobalt, a light theme, and subtle blue selections.
 
 ## Install
 
@@ -12,7 +12,7 @@ Windows 10/11 x64. Download the installer EXE from [GitHub Releases](https://git
 
 Search and filter Windows registrations, Microsoft Store, WinGet, and Chocolatey entries. Optionally include Homebrew formulae from the default WSL distribution. Multiple sources can describe the same app; choose one source per app.
 
-Check applications, choose **Review queue**, review the command and exact cleanup folder, acknowledge the review, and start the batch. A native confirmation lists the applications before execution. Silent only is enabled by default; entries without documented quiet commands are blocked. Turn it off before reviewing to permit interactive uninstallers. **Stop after current** allows the running uninstaller to finish before stopping the queue.
+Check applications, choose **Review queue**, review the command and exact cleanup folder, acknowledge the review, and start the batch. A native confirmation lists the applications before execution. **Prefer silent (interactive fallback)** is enabled by default. Apps without a documented quiet command open their registered uninstaller. Failed quiet attempts retry the reviewed interactive command when available; cancellation, reboot, busy-installer, and timeout results do not trigger another attempt. Windows, WinGet, and Chocolatey support interactive fallback. The review shows both commands. Turn the preference off to request interactive uninstall directly. Finish vendor prompts to continue the queue. **Stop after current** allows the running uninstaller to finish before stopping the queue.
 
 Hide and unhide checked entries using the selection bar. Hidden preferences persist per Windows user in the app data folder. Enable **Show hidden apps** to restore them. Hidden applications cannot be queued. Hiding or refreshing invalidates pending reviews. Node.js entries are removed from the runtimes page to retain PATH and running-process checks.
 
@@ -27,6 +27,14 @@ Install SHA-256 verified official ZIPs side by side; add existing folders; check
 Edit User and Machine PATH entries, reorder or remove entries, review and save with a backup, or undo the most recent save. Optimistic concurrency rejects stale edits. Machine PATH generally precedes User PATH. Existing terminals retain their current environment.
 
 The Packages view installs/upgrades/uninstalls the allowlisted Node.js Chocolatey packages, including exact versions. Other Chocolatey, WinGet, Store, and WSL Homebrew removals are available in Applications. Homebrew requires `/home/linuxbrew/.linuxbrew/bin/brew` in the default WSL distro. Use **Run as administrator** for machine-level operations. A shared operation lock prevents simultaneous software, runtime, package, and PATH mutations.
+
+## Python runtimes
+
+The Python runtimes page discovers Python through the registry, saved/session PATH, common installation folders, pyenv, and folders you add. It shows versions, source, estimated installation dates, observed usage, running state, saved PATH priority, and updates within each minor version. WindowsApps aliases are skipped. The saved PATH indicator does not account for virtual environments, the py launcher, or app execution aliases.
+
+Install full official Windows releases with pip from python.org. Downloads must have published SHA-256 metadata and a valid Python Software Foundation Windows signature. The catalog excludes source-only releases and is cached for offline use. You can also enter an exact stable version, 3.9 or newer, provided it has the required download metadata. Separate minor versions coexist; the manager refuses a second patch of an existing minor version to avoid replacing it through Python's shared installer registration. Remove the existing minor version first to change its patch.
+
+Add Python and its Scripts folder through the shared PATH editor. Remove both from User and Machine PATH and stop running Python processes before uninstalling. Manager-installed Python uses its verified cached official uninstaller; externally owned installations can be removed through Applications or their original installer. Installer timeouts leave the installer running and block further changes until System69 is restarted. Reboot-required results also block further changes. Real installer, uninstaller, and UAC flows require validation in a disposable Windows VM.
 
 ## Disk map
 

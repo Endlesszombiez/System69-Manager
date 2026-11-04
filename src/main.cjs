@@ -3,12 +3,13 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
 const { Manager } = require('./core/manager.cjs');
+const { PythonManager } = require('./core/python-manager.cjs');
 const win = require('./core/windows.cjs');
 const { Bridge } = require('./core/bridge.cjs');
 const { ApplicationManager } = require('./core/application-manager.cjs');
 const { DiskManager, mapArgument } = require('./core/disk-manager.cjs');
 const explorer = require('./core/explorer-integration.cjs');
-let window, manager, bridge, applications, disk;
+let window, manager, python, bridge, applications, disk;
 let pendingMap=mapArgument(process.argv);
 let demoApps = [
  {key:'Winget:7zip.7zip',id:'7zip.7zip',name:'7-Zip',version:'24.09',publisher:'Igor Pavlov',source:'Winget',sourceLabel:'WinGet',sizeLabel:'6 MB',supportsQuiet:true,protected:false,hidden:false},
@@ -69,10 +70,12 @@ async function invoke(action, payload = {}) {
   if (demo && action === 'discardQueue') { applications.queue=[];return true; }
   if (demo && action === 'hideApps') { for(const a of demoApps) if(payload.keys.includes(a.key)) a.hidden=!!payload.hide;return demoApps; }
   if (demo && action === 'prepareQueue') {
-    applications.queue=demoApps.filter(a=>payload.keys.includes(a.key)&&!a.hidden).map(a=>({...a,eligible:!a.protected&&(!payload.silent||a.supportsQuiet),status:!a.protected&&(!payload.silent||a.supportsQuiet)?'Ready':'Blocked',reason:'No documented silent command.',mode:a.supportsQuiet?'Silent requested':'May show a window',cleanup:'Off — preview mode',command:'Preview only'}));
+    applications.queue=demoApps.filter(a=>payload.keys.includes(a.key)&&!a.hidden).map(a=>({...a,eligible:!a.protected,status:a.protected?'Blocked':'Ready',mode:a.supportsQuiet&&payload.silent?'Silent preferred; interactive fallback':'Interactive uninstaller',cleanup:'Off — preview mode',command:'Preview only'}));
     return applications.queue;
   }
   if (action === 'snapshot') return demo ? demoSnapshot() : manager.exclusive('Scanning installations', () => manager.discover());
+  if(action==='pythonSnapshot') return demo ? {installations:[{version:'3.14.0',directory:'C:\\Python314',source:'System69 Manager',managed:true,active:true,inUserPath:true,inMachinePath:false,pathPosition:0,installed:'2026-10-01',latest:'3.14.1'}],architecture:'x64'} : manager.exclusive('Scanning Python installations',()=>python.discover());
+  if(action==='pythonCatalog') return demo ? {releases:[{version:'3.14.1'},{version:'3.13.9'}],date:new Date().toISOString()} : manager.exclusive('Checking Python releases',()=>python.catalog());
   if (action === 'catalog') {
     if (demo) return { date:new Date().toISOString(), releases:[{version:'v26.1.0', date:'2026-10-27', lts:false, files:['win-x64-zip']},{version:'v24.12.0',date:'2026-10-20',lts:'Krypton',files:['win-x64-zip']},{version:'v22.20.0',date:'2026-10-15',lts:'Jod',files:['win-x64-zip']},{version:'v20.20.0',date:'2026-10-10',lts:'Iron',files:['win-x64-zip']}] };
     return manager.exclusive('Checking nodejs.org releases', () => manager.catalog());
@@ -83,6 +86,20 @@ async function invoke(action, payload = {}) {
   }
   if (demo) throw new Error('Preview mode uses sample data. Restart without --demo to manage this computer.');
   if (applications.halted && !['openData'].includes(action)) throw new Error('Resolve the previous uninstall or restart Windows before making further changes.');
+  if(python.halted && action!=='openData') throw new Error('Finish the Python installer or restart Windows, then restart System69 before making further changes.');
+  if(action==='pythonFolder') {
+    const selected=await dialog.showOpenDialog(window,{title:'Choose a folder containing python.exe',properties:['openDirectory']});
+    if(!selected.canceled)await manager.exclusive('Adding Python folder',()=>python.addFolder(selected.filePaths[0]));
+    return !selected.canceled;
+  }
+  if(action==='pythonInstall') {
+    await confirm('Install Python',`Install Python ${payload.version}?`,'Downloads the full official Windows installer from python.org, checks SHA-256 and its Windows signature, and installs Python with pip. PATH stays under your control. Separate minor versions can coexist; remove an existing minor version before installing another patch of it.');
+    return manager.exclusive('Installing Python',()=>python.install(payload.version));
+  }
+  if(action==='pythonUninstall') {
+    await confirm('Uninstall Python','Remove this Python installation?',payload.directory+'\n\nRemove Python and Scripts from PATH first. The official Python uninstaller will run.');
+    return manager.exclusive('Uninstalling Python',()=>python.uninstall(payload.directory));
+  }
   if(action==='contextSet'){
     if(!app.isPackaged)throw Error('Explorer integration is available in the installed build.');
     return manager.exclusive('Updating Explorer menu',()=>explorer.setContextMenu(!!payload.enabled,contextCommand,process.execPath));
@@ -109,7 +126,7 @@ async function invoke(action, payload = {}) {
     const reviewed=JSON.stringify(applications.queue);
     const ready=applications.queue.filter(x=>x.status==='Ready');
     if(!ready.length) throw new Error('No eligible queue entries.');
-    await confirm('Uninstall applications', `Uninstall ${ready.length} reviewed application(s)?`, ready.map(x=>`${x.name} (${x.sourceLabel}) — ${x.mode}\nCleanup: ${x.cleanup}`).join('\n\n')+'\n\nOnly documented silent behavior can be requested. A vendor uninstaller may still display a window.');
+    await confirm('Uninstall applications', `Uninstall ${ready.length} reviewed application(s)?`, ready.map(x=>`${x.name} (${x.sourceLabel}) — ${x.mode}\nCleanup: ${x.cleanup}`).join('\n\n')+'\n\nSilent uninstall is preferred when available. Unsupported or failed silent attempts may open the interactive uninstaller. Finish its prompts to continue.');
     if(reviewed!==JSON.stringify(applications.queue)) throw new Error('Queue changed. Review again.');
     return manager.exclusive('Running uninstall queue',()=>applications.run());
   }
@@ -158,6 +175,7 @@ app.whenReady().then(() => {
   app.setAppUserModelId('dev.system69.manager');
   manager = new Manager(app.getPath('userData'), event => { if (window && !window.isDestroyed()) window.webContents.send('manager:event', event); });
   const emit = event => { if(window&&!window.isDestroyed())window.webContents.send('manager:event',event); };
+  python = new PythonManager(manager.dataDir,emit);
   bridge = new Bridge(path.join(app.isPackaged?process.resourcesPath:app.getAppPath(),app.isPackaged?'bridge':'native-publish','System69.Bridge.exe'),manager.dataDir,app.isPackaged?path.dirname(process.execPath):app.getAppPath(),emit);
   applications = new ApplicationManager(manager,bridge,emit);
   disk=new DiskManager(emit);
